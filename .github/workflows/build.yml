@@ -1,0 +1,53 @@
+name: Build AndUEDumper (Ubuntu)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # อนุญาตให้กดสั่ง Run จากหน้าเว็บ GitHub ได้เอง
+
+jobs:
+  build-ubuntu:
+    name: Build (Ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        # โปรเจกต์นี้ใช้ submodules จำเป็นต้องตั้งค่า recursive
+        submodules: recursive
+
+    - name: 🛠️ Install Dependencies
+      run: |
+        sudo apt-get update
+        # สคริปต์ build.sh กำหนดให้ใช้ Ninja เป็น Generator สำหรับ CMake
+        sudo apt-get install -y ninja-build cmake make
+
+    - name: 📱 Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r25c # สามารถเปลี่ยนเป็น r26b หรือ r27 ได้ตามต้องการ
+        add-to-path: false
+
+    - name: ⚙️ Set NDK_HOME Environment Variable
+      run: |
+        # สคริปต์ของโปรเจกต์ต้องการ NDK_HOME เราจึงต้องตั้งค่าตัวแปรนี้
+        echo "NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+
+    - name: 🏗️ Build Project via build.sh
+      run: |
+        cd AndUEDumper
+        # build.sh มีการถาม Interactive ว่าเอา CMake หรือ ndk-build
+        # ใช้ echo "1" | เพื่อป้อนค่าเลือก [1] CMake แบบอัตโนมัติ
+        echo "1" | bash ./build.sh
+
+    - name: 📦 Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: AndUEDumper-Ubuntu-Artifacts
+        path: AndUEDumper/cmake_build/
+        retention-days: 30
