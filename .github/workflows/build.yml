@@ -1,4 +1,4 @@
-name: Build AndUEDumper (Ubuntu)
+name: Build AndUEDumper
 
 on:
   push:
@@ -8,15 +8,15 @@ on:
   workflow_dispatch: # อนุญาตให้กดสั่ง Run จากหน้าเว็บ GitHub ได้เอง
 
 jobs:
-  build-ubuntu:
-    name: Build (Ubuntu)
+  build-linux:
+    name: Build (Linux)
     runs-on: ubuntu-latest
 
     steps:
     - name: 📥 Checkout Repository
       uses: actions/checkout@v4
       with:
-        # โปรเจกต์นี้ใช้ submodules จำเป็นต้องตั้งค่า recursive
+        # โปรเจกต์นี้ใช้ submodules ดังนั้นต้องดึงโค้ดส่วนนี้มาด้วยครับ
         submodules: recursive
 
     - name: 🛠️ Install Dependencies
@@ -29,25 +29,59 @@ jobs:
       uses: nttld/setup-ndk@v1
       id: setup-ndk
       with:
-        ndk-version: r25c # สามารถเปลี่ยนเป็น r26b หรือ r27 ได้ตามต้องการ
+        ndk-version: r29 # สามารถเปลี่ยนเป็นเวอร์ชันอื่นเช่น r26b ได้ตามต้องการ
         add-to-path: false
 
     - name: ⚙️ Set NDK_HOME Environment Variable
       run: |
-        # สคริปต์ของโปรเจกต์ต้องการ NDK_HOME เราจึงต้องตั้งค่าตัวแปรนี้
+        # สคริปต์ของโปรเจกต์ต้องการ NDK_HOME เราจึงต้องตั้งค่าตัวแปรนี้ครับ
         echo "NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
 
     - name: 🏗️ Build Project via build.sh
       run: |
         cd AndUEDumper
         # build.sh มีการถาม Interactive ว่าเอา CMake หรือ ndk-build
-        # ใช้ echo "1" | เพื่อป้อนค่าเลือก [1] CMake แบบอัตโนมัติ
+        # ใช้ echo "1" | เพื่อป้อนค่าเลือก [1] CMake แบบอัตโนมัติครับ
         echo "1" | bash ./build.sh
 
     - name: 📦 Upload Build Artifacts
       uses: actions/upload-artifact@v4
       if: success()
       with:
-        name: AndUEDumper-Ubuntu-Artifacts
+        name: AndUEDumper-Linux-Artifacts
         path: AndUEDumper/cmake_build/
-        retention-days: 30
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: 📱 Setup Android NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r29
+        add-to-path: false
+
+    - name: ⚙️ Set NDK_HOME Environment Variable
+      run: |
+        # ตั้งค่า NDK_HOME สำหรับฝั่ง Windows
+        echo "NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    - name: 🏗️ Build Project via build.bat
+      run: |
+        cd AndUEDumper
+        # ใช้ echo 1 | เพื่อป้อนค่าเลือก [1] CMake ลงใน build.bat แบบอัตโนมัติ
+        echo 1 | cmd /c build.bat
+
+    - name: 📦 Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: AndUEDumper-Windows-Artifacts
+        path: AndUEDumper/cmake_build/
